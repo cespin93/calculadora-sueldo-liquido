@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calculadora Sueldo Líquido Chile</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f4f6f9; --card: #fff; --border: #dde3ec;
+      --primary: #1a56db; --primary-hover: #1648c2;
+      --text: #1a202c; --muted: #64748b;
+      --green: #15803d; --green-bg: #f0fdf4; --green-border: #86efac;
+      --red: #b91c1c; --red-bg: #fef2f2; --red-border: #fca5a5;
+      --blue: #1d4ed8; --blue-bg: #eff6ff; --blue-border: #93c5fd;
+      --amber: #92400e; --amber-bg: #fffbeb; --amber-border: #fcd34d;
+      --orange: #9a3412; --orange-bg: #fff7ed; --orange-border: #fdba74;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg); color: var(--text); min-height: 100vh; padding: 24px 16px;
+    }
+    h1 { text-align:center; font-size:1.5rem; font-weight:700; margin-bottom:4px; }
+    .subtitle { text-align:center; color:var(--muted); font-size:.875rem; margin-bottom:20px; }
+
+    /* ── Toggle modo ── */
+    .mode-toggle {
+      display:flex; max-width:600px; margin:0 auto 24px;
+      background:#e2e8f0; border-radius:10px; padding:4px; gap:4px;
+    }
+    .mode-btn {
+      flex:1; padding:9px 10px; border:none; border-radius:7px;
+      font-size:.82rem; font-weight:600; cursor:pointer;
+      background:transparent; color:var(--muted); transition:all .15s; text-align:center;
+    }
+    .mode-btn.active { background:var(--card); color:var(--primary); box-shadow:0 1px 4px rgba(0,0,0,.1); }
+
+    /* ── Layout ── */
+    .layout {
+      display:grid; grid-template-columns:1fr 1fr;
+      gap:20px; max-width:960px; margin:0 auto;
+    }
+    .layout.comp { grid-template-columns:1fr 1fr; max-width:1200px; }
+    @media(max-width:700px){ .layout,.layout.comp{ grid-template-columns:1fr; } }
+
+    /* ── Cards ── */
+    .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:20px; }
+    .card + .card { margin-top:16px; }
+    .card-title {
+      font-size:.82rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+      color:var(--muted); margin-bottom:16px; padding-bottom:10px; border-bottom:1px solid var(--border);
+    }
+
+    /* ── Fields ── */
+    .field { margin-bottom:13px; }
+    .field label { display:block; font-size:.82rem; font-weight:600; margin-bottom:5px; }
+    .field input, .field select {
+      width:100%; padding:8px 11px; border:1px solid var(--border); border-radius:7px;
+      font-size:.88rem; color:var(--text); background:#fff; transition:border-color .15s;
+    }
+    .field input:focus, .field select:focus {
+      outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(26,86,219,.12);
+    }
+    .field input:disabled { background:#f8fafc; color:var(--muted); }
+    .field .hint { font-size:.72rem; color:var(--muted); margin-top:3px; }
+    .field-row { display:flex; gap:8px; align-items:flex-end; }
+    .field-row .field { flex:1; margin-bottom:0; }
+
+    /* ── Buttons ── */
+    .btn {
+      width:100%; padding:11px; background:var(--primary); color:#fff;
+      border:none; border-radius:8px; font-size:1rem; font-weight:700;
+      cursor:pointer; margin-top:6px; transition:background .15s;
+    }
+    .btn:hover { background:var(--primary-hover); }
+    .btn-sm {
+      padding:5px 11px; font-size:.75rem; font-weight:600; border:none;
+      border-radius:6px; cursor:pointer; transition:all .15s; white-space:nowrap;
+    }
+    .btn-toggle { background:#e0e7ff; color:#3730a3; }
+    .btn-toggle.on { background:#3730a3; color:#fff; }
+    .btn-print {
+      width:100%; padding:9px; margin-top:10px; background:#f1f5f9; color:var(--text);
+      border:1px solid var(--border); border-radius:8px; font-size:.875rem;
+      font-weight:600; cursor:pointer; transition:background .15s;
+    }
+    .btn-print:hover { background:#e2e8f0; }
+
+    /* ── Config toggle ── */
+    .config-toggle {
+      font-size:.8rem; color:var(--primary); cursor:pointer; text-decoration:underline;
+      background:none; border:none; margin-bottom:12px; display:block;
+    }
+    #config-panel { display:none; }
+
+    /* ── Rows de liquidación ── */
+    .liq-row {
+      display:flex; justify-content:space-between; align-items:baseline;
+      padding:5px 0; font-size:.88rem; border-bottom:1px solid #f1f5f9;
+    }
+    .liq-row:last-child { border-bottom:none; }
+    .liq-row .amount { font-variant-numeric:tabular-nums; font-weight:500; }
+    .liq-row.subtotal { font-weight:700; background:#f8fafc; border-radius:6px; padding:7px 6px; margin:3px 0; }
+    .liq-row.descuento .amount { color:var(--red); }
+    .liq-row.na .amount { color:var(--muted); font-size:.78rem; }
+    .liq-row.empresa .amount { color:var(--orange); }
+
+    /* ── Cajas de resultado ── */
+    .result-box {
+      border-radius:10px; padding:14px 18px;
+      display:flex; justify-content:space-between; align-items:center; margin-top:12px;
+    }
+    .result-box.liquido   { background:var(--green-bg);  border:1.5px solid var(--green-border); }
+    .result-box.imponible { background:var(--blue-bg);   border:1.5px solid var(--blue-border); }
+    .result-box.empresa   { background:var(--orange-bg); border:1.5px solid var(--orange-border); }
+    .result-box .r-label  { font-weight:700; font-size:.92rem; }
+    .result-box .r-amount { font-size:1.25rem; font-weight:800; }
+    .result-box.liquido   .r-amount { color:var(--green); }
+    .result-box.imponible .r-amount { color:var(--blue); }
+    .result-box.empresa   .r-amount { color:var(--orange); }
+
+    /* ── Info / error / warn boxes ── */
+    .info-box  { background:var(--amber-bg);  border:1px solid var(--amber-border);  border-radius:8px; padding:9px 13px; font-size:.78rem; color:var(--amber);  margin-top:10px; line-height:1.5; }
+    .error-box { background:var(--red-bg);    border:1px solid var(--red-border);    border-radius:8px; padding:11px 14px; font-size:.875rem; color:var(--red);    margin-top:10px; display:none; }
+    .warn-box  { background:var(--amber-bg);  border:1px solid var(--amber-border);  border-radius:7px; padding:7px 11px; font-size:.75rem; color:var(--amber);  margin-top:5px; display:none; }
+
+    /* ── Badge ── */
+    .badge {
+      display:inline-block; font-size:.68rem; padding:2px 6px; border-radius:10px;
+      background:#e0e7ff; color:#3730a3; font-weight:600; margin-left:5px; vertical-align:middle;
+    }
+
+    /* ── Comparador ── */
+    .comp-inputs { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    @media(max-width:700px){ .comp-inputs{ grid-template-columns:1fr; } }
+    .comp-label {
+      font-size:.7rem; font-weight:800; text-transform:uppercase; letter-spacing:.08em;
+      padding:3px 10px; border-radius:4px; margin-bottom:10px; display:inline-block;
+    }
+    .comp-label.a { background:#dbeafe; color:#1e40af; }
+    .comp-label.b { background:#fce7f3; color:#9d174d; }
+
+    .comp-table { width:100%; border-collapse:collapse; font-size:.85rem; }
+    .comp-table th {
+      text-align:left; padding:8px 10px; background:#f8fafc;
+      border-bottom:2px solid var(--border); font-size:.75rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted);
+    }
+    .comp-table th.a { background:#dbeafe; color:#1e40af; }
+    .comp-table th.b { background:#fce7f3; color:#9d174d; }
+    .comp-table td { padding:7px 10px; border-bottom:1px solid #f1f5f9; font-variant-numeric:tabular-nums; }
+    .comp-table tr.total td { font-weight:700; background:#f8fafc; }
+    .comp-table tr.highlight td { font-weight:800; font-size:.95rem; }
+    .comp-table td.red { color:var(--red); }
+    .comp-table td.green { color:var(--green); }
+    .comp-table td.orange { color:var(--orange); }
+    .comp-table td.diff-pos { color:var(--green); font-weight:600; }
+    .comp-table td.diff-neg { color:var(--red); font-weight:600; }
+
+    .hidden { display:none; }
+
+    .sliders-sep { border:none; border-top:1px solid var(--border); margin:4px 0 12px; }
+
+    /* ── Tabla variación Mutual ── */
+    .var-toggle {
+      font-size:.78rem; color:var(--orange); cursor:pointer; text-decoration:underline;
+      background:none; border:none; margin-top:12px; display:block; font-weight:600;
+    }
+    .var-table { width:100%; border-collapse:collapse; font-size:.82rem; margin-top:10px; }
+    .var-table th {
+      text-align:left; padding:6px 9px; background:#fff7ed;
+      border-bottom:2px solid var(--orange-border); font-size:.72rem;
+      text-transform:uppercase; letter-spacing:.04em; color:var(--orange);
+    }
+    .var-table td { padding:6px 9px; border-bottom:1px solid #fef3c7; font-variant-numeric:tabular-nums; }
+    .var-table tr.var-actual td { background:#fff7ed; font-weight:700; }
+    .var-table tr.var-actual td:first-child::after { content:' ◀'; font-size:.7rem; color:var(--orange); }
+    .var-table td.diff-pos { color:var(--orange); font-weight:600; }
+    .var-table td.diff-neg { color:var(--green);  font-weight:600; }
+    #panel-variacion { display:none; }
+
+    /* ── Print ── */
+    @media print {
+      body { background:#fff; padding:0; }
+      .mode-toggle, #panel-bruto, #panel-inverso, #panel-comparador,
+      .card:has(#btn-calcular), .btn-print, .config-toggle, #config-panel { display:none !important; }
+      .layout { grid-template-columns:1fr; max-width:100%; }
+      #resultado, #resultado-comp { display:block !important; }
+      .card { box-shadow:none; border:1px solid #ccc; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>Calculadora Sueldo Líquido</h1>
+<p class="subtitle">Normativa Chile · AFP · FONASA/Isapre · AFC · Impuesto Único 2ª Categoría · Costo Empresa</p>
+
+<div class="mode-toggle">
+  <button class="mode-btn active" id="btn-bruto"    onclick="setModo('bruto')">Bruto → Líquido</button>
+  <button class="mode-btn"        id="btn-inverso"  onclick="setModo('inverso')">Líquido → Bruto</button>
+  <button class="mode-btn"        id="btn-comp"     onclick="setModo('comp')">Comparador</button>
+</div>
+
+<div class="layout" id="main-layout">
+
+  <!-- ════════════ COLUMNA INPUTS ════════════ -->
+  <div>
+
+    <!-- MODO BRUTO -->
+    <div class="card" id="panel-bruto">
+      <div class="card-title">Haberes</div>
+
+      <div class="field">
+        <label>Sueldo base ($)</label>
+        <input type="number" id="sueldoBase" value="1298388" min="0" step="1" oninput="checkIMM()" />
+        <div class="warn-box" id="warn-imm"></div>
+      </div>
+
+      <div class="field">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+          <label style="margin:0;">Gratificación ($)</label>
+          <button class="btn-sm btn-toggle" id="btn-gratif-auto" onclick="toggleGratifAuto()">Auto</button>
+        </div>
+        <input type="number" id="gratificacion" value="209396" min="0" step="1" />
+        <div class="hint" id="hint-gratif">Manual · 25% s/base tope 4.75 IMM/12.</div>
+      </div>
+
+      <div class="field">
+        <label>Bonos imponibles ($)</label>
+        <input type="number" id="bonosImponibles" value="0" min="0" step="1" />
+      </div>
+      <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:8px;margin-top:4px;">Haberes no imponibles</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Movilización ($)</label>
+          <input type="number" id="movilizacion" value="0" min="0" step="1" />
+        </div>
+        <div class="field">
+          <label>Colación ($)</label>
+          <input type="number" id="colacion" value="0" min="0" step="1" />
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Viáticos ($)</label>
+          <input type="number" id="viaticos" value="0" min="0" step="1" />
+        </div>
+        <div class="field">
+          <label>Otros no imponibles ($)</label>
+          <input type="number" id="otrosNoImp" value="0" min="0" step="1" />
+        </div>
+      </div>
+      <div class="field">
+        <label>APV ($)</label>
+        <input type="number" id="apv" value="0" min="0" step="1" />
+        <div class="hint">Régimen A · Se descuenta de la base tributable.</div>
+      </div>
+      <div class="field">
+        <label>Otros descuentos ($)</label>
+        <input type="number" id="otrosDescuentos" value="0" min="0" step="1" />
+        <div class="hint">Préstamos, seguros, etc.</div>
+      </div>
+      <div class="field">
+        <label>Tipo de contrato</label>
+        <select id="tipoContrato">
+          <option value="indefinido">Indefinido</option>
+          <option value="plazoFijo">Plazo fijo</option>
+          <option value="obraFaena">Por obra / faena</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- MODO INVERSO -->
+    <div class="card hidden" id="panel-inverso">
+      <div class="card-title">Sueldo líquido deseado</div>
+      <div class="field">
+        <label>Sueldo líquido ($)</label>
+        <input type="number" id="inv-liquido" value="1200000" min="0" step="1" />
+        <div class="hint">¿Cuánto quiere recibir el trabajador?</div>
+      </div>
+
+      <div class="field">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+          <label style="margin:0;">Gratificación ($)</label>
+          <button class="btn-sm btn-toggle" id="btn-inv-gratif-auto" onclick="toggleInvGratifAuto()">Auto</button>
+        </div>
+        <input type="number" id="inv-gratif" value="0" min="0" step="1" />
+        <div class="hint" id="hint-inv-gratif">Manual · Se descuenta del imponible para calcular sueldo base.</div>
+      </div>
+
+      <div class="field">
+        <label>Bonos imponibles ($)</label>
+        <input type="number" id="inv-bonosImp" value="0" min="0" step="1" />
+        <div class="hint">Se descuentan del imponible junto con la gratificación.</div>
+      </div>
+
+      <div class="field">
+        <label>APV ($)</label>
+        <input type="number" id="inv-apv" value="0" min="0" step="1" />
+        <div class="hint">Régimen A.</div>
+      </div>
+      <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:8px;margin-top:4px;">Haberes no imponibles</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Movilización ($)</label>
+          <input type="number" id="inv-movil" value="0" min="0" step="1" />
+        </div>
+        <div class="field">
+          <label>Colación ($)</label>
+          <input type="number" id="inv-colacion" value="0" min="0" step="1" />
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Viáticos ($)</label>
+          <input type="number" id="inv-viaticos" value="0" min="0" step="1" />
+        </div>
+        <div class="field">
+          <label>Otros no imponibles ($)</label>
+          <input type="number" id="inv-otrosNoImp" value="0" min="0" step="1" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Otros descuentos ($)</label>
+        <input type="number" id="inv-otrosDesc" value="0" min="0" step="1" />
+      </div>
+      <div class="field">
+        <label>Tipo de contrato</label>
+        <select id="inv-tipoContrato">
+          <option value="indefinido">Indefinido</option>
+          <option value="plazoFijo">Plazo fijo</option>
+          <option value="obraFaena">Por obra / faena</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- MODO COMPARADOR -->
+    <div class="card hidden" id="panel-comparador">
+      <div class="card-title">Comparar dos sueldos</div>
+      <div class="comp-inputs">
+        <!-- Opción A -->
+        <div>
+          <span class="comp-label a">Opción A</span>
+          <div class="field">
+            <label>Sueldo base ($)</label>
+            <input type="number" id="ca-base" value="1200000" min="0" step="1" />
+          </div>
+          <div class="field">
+            <label>Gratificación ($)</label>
+            <input type="number" id="ca-gratif" value="0" min="0" step="1" />
+          </div>
+          <div class="field">
+            <label>Bonos imponibles ($)</label>
+            <input type="number" id="ca-bonosImp" value="0" min="0" step="1" />
+          </div>
+          <div class="field">
+            <label>Bonos no imponibles ($)</label>
+            <input type="number" id="ca-bonosNoImp" value="0" min="0" step="1" />
+          </div>
+          <div class="field">
+            <label>APV ($)</label>
+            <input type="number" id="ca-apv" value="0" min="0" step="1" />
+          </div>
+          <div class="field">
+            <label>Tipo contrato</label>
+            <select id="ca-contrato">
+              <option value="indefinido">Indefinido</option>
+              <option value="plazoFijo">Plazo fijo</option>
+              <option value="obraFaena">Obra/faena</option>
+            </select>
+          </div>
+        </div>
+        <!-- Opción B -->
+        <div>
+          <span class="comp-label b">Opción B</span>
+          <div class="field">
+            <label>Sueldo base ($)</label>
+            <input type="number" id="cb-base" value="1400000" min="0" step="1" />
+          </div>
+          <div class="field">
+            <label>Gratificación ($)</label>
+            <input type="number" id="cb-gratif" value="0" min="0" step="1" />
+          </div>
+          <div class="field">
+            <label>Bonos imponibles ($)</label>
+            <input type="number" id="cb-bonosImp" value="0" min="0" step="1" />
+          </div>
+          <div class="field">
+            <label>Bonos no imponibles ($)</label>
+            <input type="number" id="cb-bonosNoImp" value="0" min="0" step="1" />
+          </div>
+          <div class="field">
+            <label>APV ($)</label>
+            <input type="number" id="cb-apv" value="0" min="0" step="1" />
+          </div>
+          <div class="field">
+            <label>Tipo contrato</label>
+            <select id="cb-contrato">
+              <option value="indefinido">Indefinido</option>
+              <option value="plazoFijo">Plazo fijo</option>
+              <option value="obraFaena">Obra/faena</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Parámetros legales -->
+    <div class="card">
+      <div class="card-title">Parámetros legales</div>
+      <button class="config-toggle" onclick="toggleConfig()">▾ Modificar parámetros</button>
+      <div id="config-panel">
+        <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:8px;">Trabajador</div>
+        <div class="field" style="margin-bottom:10px;">
+          <label>AFP</label>
+          <select id="selectAFP" onchange="seleccionarAFP()">
+            <option value="">— Seleccionar AFP —</option>
+            <option value="11.44">AFP Capital (11.44%)</option>
+            <option value="11.44" data-nombre="Cuprum">AFP Cuprum (11.44%)</option>
+            <option value="11.27">AFP Habitat (11.27%)</option>
+            <option value="10.58">AFP Modelo (10.58%)</option>
+            <option value="11.16">AFP PlanVital (11.16%)</option>
+            <option value="11.45" selected>AFP ProVida (11.45%)</option>
+            <option value="10.49">AFP Uno (10.49%)</option>
+            <option value="">Manual</option>
+          </select>
+        </div>
+        <div class="field-row" style="margin-bottom:13px;">
+          <div class="field"><label>% AFP</label><input type="number" id="pctAFP" value="11.45" min="0" max="20" step="0.01" /></div>
+          <div class="field"><label>% Salud</label><input type="number" id="pctSalud" value="7" min="0" max="15" step="0.01" /></div>
+          <div class="field"><label>% AFC trab.</label><input type="number" id="pctAFC" value="0.6" min="0" max="5" step="0.01" /></div>
+        </div>
+        <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:8px;">Empleador</div>
+        <div class="field-row" style="margin-bottom:13px;">
+          <div class="field"><label>% AFC indef.</label><input type="number" id="pctAfcEmpIndef" value="2.4" min="0" max="5" step="0.01" /></div>
+          <div class="field"><label>% AFC fijo</label><input type="number" id="pctAfcEmpFijo" value="3.0" min="0" max="5" step="0.01" /></div>
+          <div class="field"><label>% SIS AFP</label><input type="number" id="pctSIS" value="1.49" min="0" max="5" step="0.01" /></div>
+          <div class="field"><label>% Mutual</label><input type="number" id="pctMutual" value="0.93" min="0" max="5" step="0.01" /></div>
+        </div>
+        <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:8px;">General</div>
+        <div class="field">
+          <label>Valor UTM ($)</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="number" id="utm" value="69889" min="1" step="1" style="flex:1;" />
+            <select id="utm-mes" onchange="seleccionarUTM()" style="width:130px;padding:8px;border:1px solid var(--border);border-radius:7px;font-size:.8rem;">
+              <option value="">Manual</option>
+            </select>
+          </div>
+          <div class="hint" id="utm-hint">Fuente: SII 2026</div>
+        </div>
+        <div class="field">
+          <label>IMM vigente ($)</label>
+          <input type="number" id="imm" value="539000" min="0" step="1" />
+          <div class="hint" id="imm-hint">Cargando valor vigente…</div>
+        </div>
+      </div>
+      <button class="btn" id="btn-calcular" onclick="calcular()">Calcular sueldo líquido</button>
+      <div class="error-box" id="errorBox"></div>
+    </div>
+  </div>
+
+  <!-- ════════════ COLUMNA RESULTADOS ════════════ -->
+  <div>
+
+    <!-- Resultado normal (bruto/inverso) -->
+    <div id="resultado" class="hidden">
+      <div class="card">
+        <div class="card-title" id="res-titulo">Liquidación de remuneraciones</div>
+        <div id="liq-haberes-imp"></div>
+        <div id="liq-haberes-noimp"></div>
+        <div id="liq-total-haberes"></div>
+        <div style="margin-top:14px;">
+          <div class="card-title" style="margin-bottom:10px;">Descuentos trabajador</div>
+          <div id="liq-descuentos"></div>
+          <div id="liq-total-desc"></div>
+        </div>
+        <div id="resultado-final"></div>
+        <div id="info-inverso" class="info-box hidden"></div>
+      </div>
+
+      <!-- Costo empresa -->
+      <div class="card" id="card-empresa">
+        <div class="card-title">Costo total empresa</div>
+
+        <!-- Inputs Opción C -->
+        <div class="field-row" style="margin-bottom:13px;">
+          <div class="field">
+            <label>% AFC Empleador</label>
+            <input type="number" id="sl-afc" value="2.4" min="0" max="5" step="0.01" oninput="onSliderChange()" />
+          </div>
+          <div class="field">
+            <label>% SIS AFP</label>
+            <input type="number" id="sl-sis" value="1.49" min="0" max="3" step="0.01" oninput="onSliderChange()" />
+          </div>
+          <div class="field">
+            <label>% Mutual de Seguridad</label>
+            <input type="number" id="sl-mutual" value="0.93" min="0" max="5" step="0.01" oninput="onSliderChange()" />
+          </div>
+        </div>
+
+        <hr class="sliders-sep" />
+
+        <!-- Desglose -->
+        <div id="liq-empresa"></div>
+        <div class="result-box empresa">
+          <span class="r-label">COSTO MENSUAL EMPRESA</span>
+          <span class="r-amount" id="res-costo-empresa">—</span>
+        </div>
+
+        <!-- Variación Mutual (Opción A) -->
+        <button class="var-toggle" onclick="toggleVariacion()">▾ Ver variación por tasa Mutual</button>
+        <div id="panel-variacion">
+          <div id="tabla-variacion"></div>
+        </div>
+      </div>
+
+      <button class="btn-print" onclick="window.print()">Imprimir liquidación</button>
+    </div>
+
+    <!-- Resultado comparador -->
+    <div id="resultado-comp" class="hidden">
+      <div class="card">
+        <div class="card-title">Comparativa</div>
+        <div id="comp-tabla"></div>
+      </div>
+      <button class="btn-print" onclick="window.print()" style="max-width:960px;margin-top:10px;">Imprimir comparativa</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════
+// DATOS
+// ════════════════════════════════════════════════════════
+
+// IMM por vigencia — cambia ~1 vez al año (Ley de Presupuesto, normalmente julio)
+// Fuente: Ministerio del Trabajo y Previsión Social · minsal.cl / dt.gob.cl
+const IMM_HISTORIAL = [
+  { desde: new Date('2023-07-01'), imm: 440000, label: 'Jul 2023 – Jun 2024' },
+  { desde: new Date('2024-07-01'), imm: 500000, label: 'Jul 2024 – Mar 2025' },
+  { desde: new Date('2025-04-01'), imm: 520000, label: 'Abr 2025 – Mar 2026' },
+  { desde: new Date('2026-04-01'), imm: 539000, label: 'Abr 2026 – vigente'  },
+];
+
+function getIMMVigente() {
+  const hoy = new Date();
+  // Recorrer de más reciente a más antiguo
+  for (let i = IMM_HISTORIAL.length - 1; i >= 0; i--) {
+    if (hoy >= IMM_HISTORIAL[i].desde) return IMM_HISTORIAL[i];
+  }
+  return IMM_HISTORIAL[0];
+}
+
+function initIMM() {
+  const vigente = getIMMVigente();
+  document.getElementById('imm').value = vigente.imm;
+  document.getElementById('imm-hint').textContent =
+    `Vigente: $${vigente.imm.toLocaleString('es-CL')} · ${vigente.label} · Ministerio del Trabajo`;
+}
+
+const UTM_2026 = {
+  1: { utm: 69751, label: 'Enero 2026'   },
+  2: { utm: 69611, label: 'Febrero 2026' },
+  3: { utm: 69889, label: 'Marzo 2026'   },
+  4: { utm: 69889, label: 'Abril 2026'   },
+  5: { utm: 70588, label: 'Mayo 2026'    },
+};
+
+const TABLA_IMPUESTO = [
+  { desde: 0,    hasta: 13.5,     factor: 0,     rebaja: 0      },
+  { desde: 13.5, hasta: 30,       factor: 0.04,  rebaja: 0.54   },
+  { desde: 30,   hasta: 50,       factor: 0.08,  rebaja: 1.74   },
+  { desde: 50,   hasta: 70,       factor: 0.135, rebaja: 4.49   },
+  { desde: 70,   hasta: 90,       factor: 0.23,  rebaja: 11.14  },
+  { desde: 90,   hasta: 120,      factor: 0.304, rebaja: 17.80  },
+  { desde: 120,  hasta: 150,      factor: 0.35,  rebaja: 23.32  },
+  { desde: 150,  hasta: Infinity, factor: 0.40,  rebaja: 30.82  },
+];
+
+// ════════════════════════════════════════════════════════
+// CÁLCULOS PUROS
+// ════════════════════════════════════════════════════════
+
+function calcularImpuesto(baseTributable, utm) {
+  const baseUtm = baseTributable / utm;
+  const t = TABLA_IMPUESTO.find(t => baseUtm >= t.desde && baseUtm < t.hasta);
+  if (!t || t.factor === 0) return 0;
+  return Math.max(0, Math.round((baseUtm * t.factor - t.rebaja) * utm));
+}
+
+function calcularDesdeImponible(imp, cfg) {
+  const { bonosNoImponibles, otrosDescuentos, apv, tipoContrato,
+          pctAFP, pctSalud, pctAFC, pctAfcEmpIndef, pctAfcEmpFijo, pctSIS, pctMutual, utm } = cfg;
+
+  const totalHaberes = imp + bonosNoImponibles;
+  const montoAFP     = Math.round(imp * pctAFP   / 100);
+  const montoSalud   = Math.round(imp * pctSalud / 100);
+  const afcAplica    = tipoContrato === 'indefinido';
+  const montoAFC     = afcAplica ? Math.round(imp * pctAFC / 100) : 0;
+  const leyesSoc     = montoAFP + montoSalud + montoAFC;
+  const baseTrib     = Math.max(0, imp - leyesSoc - apv);
+  const impuesto     = calcularImpuesto(baseTrib, utm);
+  const totalDesc    = leyesSoc + impuesto + otrosDescuentos;
+  const liquido      = totalHaberes - totalDesc;
+
+  // Costo empresa
+  const pctAfcEmp  = tipoContrato === 'indefinido' ? pctAfcEmpIndef : pctAfcEmpFijo;
+  const afcEmp     = Math.round(imp * pctAfcEmp  / 100);
+  const sisAfp     = Math.round(imp * pctSIS     / 100);
+  const mutual     = Math.round(imp * pctMutual  / 100);
+  const costoTotal = totalHaberes + afcEmp + sisAfp + mutual;
+
+  return {
+    totalImponible: imp, totalHaberes, bonosNoImponibles,
+    montoAFP, montoSalud, montoAFC, afcAplica, apv,
+    baseTrib, impuesto, otrosDescuentos, totalDesc, liquido,
+    afcEmp, sisAfp, mutual, costoTotal,
+    pctAFP, pctSalud, pctAFC, pctAfcEmp, pctSIS, pctMutual,
+    tipoContrato,
+  };
+}
+
+function calcularInverso(liquidoDeseado, cfg) {
+  const { bonosNoImponibles, otrosDescuentos, apv, tipoContrato, pctAFP, pctSalud, pctAFC, utm } = cfg;
+  const afcPct = tipoContrato === 'indefinido' ? pctAFC : 0;
+  const k = (pctAFP + pctSalud + afcPct) / 100;
+
+  for (const t of TABLA_IMPUESTO) {
+    const f = t.factor, r = t.rebaja;
+    const divisor = (1 - k) * (1 - f);
+    if (divisor <= 0) continue;
+    // Con APV: I = (L - apv*f - r*utm + otros - bonosNoImp) / ((1-k)*(1-f))
+    const numerador = liquidoDeseado - apv * f - r * utm + otrosDescuentos - bonosNoImponibles;
+    const imp = numerador / divisor;
+    if (imp <= 0) continue;
+    const baseTrib    = Math.max(0, imp * (1 - k) - apv);
+    const baseTribUtm = baseTrib / utm;
+    if (baseTribUtm >= t.desde && baseTribUtm < t.hasta) {
+      return calcularDesdeImponible(Math.round(imp), { ...cfg, tipoContrato, pctAFC: afcPct });
+    }
+  }
+  return null;
+}
+
+function gratificacionAuto(sueldoBase, imm) {
+  const tope = Math.floor((4.75 * imm) / 12);
+  return Math.min(Math.floor(sueldoBase * 0.25), tope);
+}
+
+// ════════════════════════════════════════════════════════
+// UI HELPERS
+// ════════════════════════════════════════════════════════
+
+let modoActual = 'bruto';
+let gratifAutoOn = false;
+let invGratifAutoOn = false;
+let lastR = null; // último resultado calculado, para actualizar sliders en tiempo real
+
+function fmt(n)  { return '$' + Math.round(n).toLocaleString('es-CL'); }
+function fmtDiff(n) {
+  const s = Math.round(n).toLocaleString('es-CL');
+  return n >= 0 ? '+$' + s : '-$' + Math.abs(Math.round(n)).toLocaleString('es-CL');
+}
+function num(id) { return parseFloat(document.getElementById(id).value) || 0; }
+function val(id) { return document.getElementById(id).value; }
+
+function row(label, amount, cls = '') {
+  return `<div class="liq-row ${cls}"><span class="label">${label}</span><span class="amount">${amount}</span></div>`;
+}
+
+function getConfig() {
+  return {
+    pctAFP:          num('pctAFP'),
+    pctSalud:        num('pctSalud'),
+    pctAFC:          num('pctAFC'),
+    pctAfcEmpIndef:  num('pctAfcEmpIndef'),
+    pctAfcEmpFijo:   num('pctAfcEmpFijo'),
+    pctSIS:          num('pctSIS'),
+    pctMutual:       num('pctMutual'),
+    utm:             num('utm'),
+    imm:             num('imm'),
+  };
+}
+
+function toggleConfig() {
+  const p = document.getElementById('config-panel');
+  p.style.display = p.style.display === 'block' ? 'none' : 'block';
+}
+
+function toggleGratifAuto() {
+  gratifAutoOn = !gratifAutoOn;
+  const btn = document.getElementById('btn-gratif-auto');
+  const inp = document.getElementById('gratificacion');
+  const hint = document.getElementById('hint-gratif');
+  btn.classList.toggle('on', gratifAutoOn);
+  inp.disabled = gratifAutoOn;
+  if (gratifAutoOn) {
+    const imm = num('imm');
+    const base = num('sueldoBase');
+    const g = gratificacionAuto(base, imm);
+    inp.value = g;
+    hint.textContent = `Auto · 25% base (tope $${Math.floor((4.75*imm)/12).toLocaleString('es-CL')}/mes) = ${fmt(g)}`;
+  } else {
+    hint.textContent = 'Manual · 25% s/base tope 4.75 IMM/12.';
+  }
+}
+
+function toggleInvGratifAuto() {
+  invGratifAutoOn = !invGratifAutoOn;
+  const btn  = document.getElementById('btn-inv-gratif-auto');
+  const inp  = document.getElementById('inv-gratif');
+  const hint = document.getElementById('hint-inv-gratif');
+  btn.classList.toggle('on', invGratifAutoOn);
+  inp.disabled = invGratifAutoOn;
+  if (invGratifAutoOn) {
+    hint.textContent = 'Auto · Se calculará al obtener el imponible.';
+    inp.value = '';
+    inp.placeholder = 'Se calcula automáticamente';
+  } else {
+    hint.textContent = 'Manual · Se descuenta del imponible para calcular sueldo base.';
+    inp.placeholder = '';
+  }
+}
+
+function checkIMM() {
+  const base = num('sueldoBase');
+  const imm  = num('imm');
+  const warn = document.getElementById('warn-imm');
+  if (base > 0 && base < imm) {
+    warn.textContent = `Sueldo base menor al IMM vigente ($${imm.toLocaleString('es-CL')}).`;
+    warn.style.display = 'block';
+  } else {
+    warn.style.display = 'none';
+  }
+  if (gratifAutoOn) toggleGratifAuto(); // recalcular
+}
+
+function setModo(modo) {
+  modoActual = modo;
+  ['bruto','inverso','comp'].forEach(m => {
+    document.getElementById(`btn-${m === 'comp' ? 'comp' : m}`).classList.toggle('active', m === modo);
+    const panel = document.getElementById(`panel-${m === 'bruto' ? 'bruto' : m === 'inverso' ? 'inverso' : 'comparador'}`);
+    panel.classList.toggle('hidden', m !== modo);
+  });
+  document.getElementById('resultado').classList.add('hidden');
+  document.getElementById('resultado-comp').classList.add('hidden');
+  document.getElementById('errorBox').style.display = 'none';
+  const layout = document.getElementById('main-layout');
+  layout.classList.toggle('comp', modo === 'comp');
+  document.getElementById('btn-calcular').textContent =
+    modo === 'bruto' ? 'Calcular sueldo líquido' :
+    modo === 'inverso' ? 'Calcular imponible requerido' : 'Comparar opciones';
+}
+
+function initUTM() {
+  const sel = document.getElementById('utm-mes');
+  for (const [mes, datos] of Object.entries(UTM_2026)) {
+    const opt = document.createElement('option');
+    opt.value = mes; opt.textContent = datos.label;
+    sel.appendChild(opt);
+  }
+  const mesActual = new Date().getMonth() + 1;
+  const ultimo = Math.max(...Object.keys(UTM_2026).map(Number));
+  const usar = UTM_2026[mesActual] ? mesActual : ultimo;
+  sel.value = usar;
+  seleccionarUTM();
+  if (!UTM_2026[mesActual]) {
+    document.getElementById('utm-hint').textContent =
+      `UTM de ${['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][mesActual-1]} aún no publicada · Usando ${UTM_2026[ultimo].label}`;
+  }
+}
+
+function seleccionarUTM() {
+  const mes = parseInt(document.getElementById('utm-mes').value);
+  if (!mes || !UTM_2026[mes]) return;
+  document.getElementById('utm').value = UTM_2026[mes].utm;
+  document.getElementById('utm-hint').textContent =
+    `Fuente: SII · ${UTM_2026[mes].label} · $${UTM_2026[mes].utm.toLocaleString('es-CL')}`;
+}
+
+function seleccionarAFP() {
+  const sel = document.getElementById('selectAFP');
+  const pct = sel.value;
+  if (pct !== '') {
+    document.getElementById('pctAFP').value = pct;
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// RENDER
+// ════════════════════════════════════════════════════════
+
+function renderLiquidacion(r, modo, sueldoBase, gratificacion, bonosImponibles, noImp = {}) {
+  const { movilizacion = 0, colacion = 0, viaticos = 0, otrosNoImp = 0 } = noImp;
+  // Haberes
+  let habImp = '';
+  if (modo === 'bruto' || sueldoBase > 0 || gratificacion > 0) {
+    if (sueldoBase > 0)    habImp += row('Sueldo base', fmt(sueldoBase));
+    if (gratificacion > 0) habImp += row('Gratificación', fmt(gratificacion));
+    if (bonosImponibles > 0) habImp += row('Bonos imponibles', fmt(bonosImponibles));
+    if (sueldoBase <= 0 && gratificacion <= 0 && bonosImponibles <= 0)
+      habImp += row('Imponible requerido', fmt(r.totalImponible));
+  } else {
+    habImp += row('Imponible requerido', fmt(r.totalImponible));
+  }
+  habImp += row('Total imponible', fmt(r.totalImponible), 'subtotal');
+  document.getElementById('liq-haberes-imp').innerHTML = habImp;
+
+  let habNoImp = '';
+  if (r.bonosNoImponibles) {
+    habNoImp = `<div style="margin-top:8px;font-weight:700;font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;">No imponibles</div>`;
+    if (movilizacion) habNoImp += row('Movilización', fmt(movilizacion));
+    if (colacion)     habNoImp += row('Colación',     fmt(colacion));
+    if (viaticos)     habNoImp += row('Viáticos',     fmt(viaticos));
+    if (otrosNoImp)   habNoImp += row('Otros no imponibles', fmt(otrosNoImp));
+  }
+  document.getElementById('liq-haberes-noimp').innerHTML = habNoImp;
+  document.getElementById('liq-total-haberes').innerHTML =
+    `<div style="margin-top:4px;">` + row('TOTAL HABERES', fmt(r.totalHaberes), 'subtotal') + `</div>`;
+
+  // Descuentos
+  let desc = '';
+  desc += row(`AFP (${r.pctAFP}%)`, fmt(r.montoAFP), 'descuento');
+  desc += row(`Salud (${r.pctSalud}%)`, fmt(r.montoSalud), 'descuento');
+  if (r.afcAplica) {
+    desc += row(`AFC trabajador (${r.pctAFC}%)`, fmt(r.montoAFC), 'descuento');
+  } else {
+    desc += row('AFC trabajador', 'No aplica', 'na');
+  }
+  if (r.apv) desc += row('APV Régimen A', fmt(r.apv), 'descuento');
+  desc += row('Base tributable', fmt(r.baseTrib));
+  desc += row('Impuesto único 2ª cat.', fmt(r.impuesto), 'descuento');
+  if (r.otrosDescuentos) desc += row('Otros descuentos', fmt(r.otrosDescuentos), 'descuento');
+  document.getElementById('liq-descuentos').innerHTML = desc;
+  document.getElementById('liq-total-desc').innerHTML =
+    `<div style="margin-top:4px;">` + row('TOTAL DESCUENTOS', fmt(r.totalDesc), 'subtotal descuento') + `</div>`;
+
+  // Resultado final
+  if (modo === 'bruto') {
+    document.getElementById('resultado-final').innerHTML = `
+      <div class="result-box liquido">
+        <span class="r-label">SUELDO LÍQUIDO</span>
+        <span class="r-amount">${fmt(r.liquido)}</span>
+      </div>`;
+    document.getElementById('info-inverso').classList.add('hidden');
+  } else {
+    const tieneDetalle = sueldoBase > 0 || gratificacion > 0;
+    document.getElementById('resultado-final').innerHTML = `
+      <div class="result-box imponible">
+        <span class="r-label">IMPONIBLE REQUERIDO</span>
+        <span class="r-amount">${fmt(r.totalImponible)}</span>
+      </div>
+      <div class="result-box liquido" style="margin-top:8px;">
+        <span class="r-label">SUELDO LÍQUIDO RESULTANTE</span>
+        <span class="r-amount">${fmt(r.liquido)}</span>
+      </div>`;
+    const info = document.getElementById('info-inverso');
+    if (!tieneDetalle) {
+      info.textContent = `El imponible de ${fmt(r.totalImponible)} puede estructurarse como sueldo base + gratificación + bonos imponibles.`;
+      info.classList.remove('hidden');
+    } else {
+      info.classList.add('hidden');
+    }
+  }
+
+  document.getElementById('res-titulo').textContent =
+    modo === 'bruto' ? 'Liquidación de remuneraciones' : 'Desglose a partir del líquido deseado';
+}
+
+function syncSliders(r) {
+  document.getElementById('sl-afc').value    = r.pctAfcEmp;
+  document.getElementById('sl-sis').value    = r.pctSIS;
+  document.getElementById('sl-mutual').value = r.pctMutual;
+}
+
+function onSliderChange() {
+  if (!lastR) return;
+  const imp          = lastR.totalImponible;
+  const totalHaberes = lastR.totalHaberes;
+  const pctAfcEmp    = parseFloat(document.getElementById('sl-afc').value)    || 0;
+  const pctSIS       = parseFloat(document.getElementById('sl-sis').value)    || 0;
+  const pctMutual    = parseFloat(document.getElementById('sl-mutual').value) || 0;
+
+  // Sincronizar al panel de config
+  document.getElementById('pctAfcEmpIndef').value = pctAfcEmp;
+  document.getElementById('pctAfcEmpFijo').value  = pctAfcEmp;
+  document.getElementById('pctSIS').value         = pctSIS;
+  document.getElementById('pctMutual').value      = pctMutual;
+
+  const afcEmp     = Math.round(imp * pctAfcEmp / 100);
+  const sisAfp     = Math.round(imp * pctSIS    / 100);
+  const mutual     = Math.round(imp * pctMutual / 100);
+  const costoTotal = totalHaberes + afcEmp + sisAfp + mutual;
+  const contrato   = lastR.tipoContrato === 'indefinido' ? 'Indefinido'
+                   : lastR.tipoContrato === 'plazoFijo'  ? 'Plazo fijo' : 'Obra/faena';
+
+  let emp = '';
+  emp += row('Remuneración bruta (haberes)', fmt(totalHaberes));
+  emp += row(`AFC empleador (${pctAfcEmp}% · ${contrato})`, fmt(afcEmp), 'empresa');
+  emp += row(`SIS AFP (${pctSIS}%)`, fmt(sisAfp), 'empresa');
+  emp += row(`Mutual de Seguridad (${pctMutual}%)`, fmt(mutual), 'empresa');
+  document.getElementById('liq-empresa').innerHTML = emp;
+  document.getElementById('res-costo-empresa').textContent = fmt(costoTotal);
+
+  if (document.getElementById('panel-variacion').style.display === 'block')
+    renderVariacion(imp, totalHaberes, lastR.tipoContrato, pctAfcEmp, pctSIS, pctMutual);
+}
+
+function toggleVariacion() {
+  const p = document.getElementById('panel-variacion');
+  const abierto = p.style.display === 'block';
+  p.style.display = abierto ? 'none' : 'block';
+  if (!abierto && lastR) {
+    const pctAfcEmp = parseFloat(document.getElementById('sl-afc').value);
+    const pctSIS    = parseFloat(document.getElementById('sl-sis').value);
+    const pctMutual = parseFloat(document.getElementById('sl-mutual').value);
+    renderVariacion(lastR.totalImponible, lastR.totalHaberes, lastR.tipoContrato, pctAfcEmp, pctSIS, pctMutual);
+  }
+}
+
+function renderVariacion(imp, totalHaberes, tipoContrato, pctAfcEmp, pctSIS, pctMutualActual) {
+  const escenarios = [
+    { label: 'Tasa base',       pct: 0.93 },
+    { label: 'Riesgo bajo',     pct: 1.50 },
+    { label: 'Riesgo medio',    pct: 2.50 },
+    { label: 'Riesgo alto',     pct: 3.40 },
+    { label: 'Máximo legal',    pct: 4.33 },
+  ];
+
+  const costoBase = totalHaberes
+    + Math.round(imp * pctAfcEmp / 100)
+    + Math.round(imp * pctSIS    / 100)
+    + Math.round(imp * 0.93      / 100);  // diferencial respecto a tasa base
+
+  let html = `<table class="var-table">
+    <thead><tr>
+      <th>Escenario Mutual</th><th>%</th><th>Monto mutual</th><th>Total empresa</th><th>vs tasa base</th>
+    </tr></thead><tbody>`;
+
+  for (const e of escenarios) {
+    const mutual     = Math.round(imp * e.pct / 100);
+    const afcEmp     = Math.round(imp * pctAfcEmp / 100);
+    const sisAfp     = Math.round(imp * pctSIS    / 100);
+    const costoTotal = totalHaberes + afcEmp + sisAfp + mutual;
+    const diff       = costoTotal - costoBase;
+    const diffStr    = diff === 0 ? '—' : (diff > 0 ? '+' : '') + '$' + Math.abs(diff).toLocaleString('es-CL');
+    const diffCls    = diff > 0 ? 'diff-pos' : diff < 0 ? 'diff-neg' : '';
+    const esActual   = Math.abs(e.pct - pctMutualActual) < 0.05;
+
+    html += `<tr class="${esActual ? 'var-actual' : ''}">
+      <td>${e.label}</td>
+      <td>${e.pct}%</td>
+      <td>${fmt(mutual)}</td>
+      <td>${fmt(costoTotal)}</td>
+      <td class="${diffCls}">${diffStr}</td>
+    </tr>`;
+  }
+
+  // Si la tasa actual no coincide con ningún escenario, agregarla resaltada
+  const yaEsta = escenarios.some(e => Math.abs(e.pct - pctMutualActual) < 0.05);
+  if (!yaEsta) {
+    const mutual     = Math.round(imp * pctMutualActual / 100);
+    const costoTotal = totalHaberes + Math.round(imp * pctAfcEmp / 100) + Math.round(imp * pctSIS / 100) + mutual;
+    const diff       = costoTotal - costoBase;
+    const diffStr    = diff === 0 ? '—' : (diff > 0 ? '+' : '') + '$' + Math.abs(diff).toLocaleString('es-CL');
+    html += `<tr class="var-actual">
+      <td>Tasa actual</td>
+      <td>${pctMutualActual}%</td>
+      <td>${fmt(mutual)}</td>
+      <td>${fmt(costoTotal)}</td>
+      <td class="diff-pos">${diffStr}</td>
+    </tr>`;
+  }
+
+  html += '</tbody></table>';
+  document.getElementById('tabla-variacion').innerHTML = html;
+}
+
+function renderEmpresa(r) {
+  lastR = r;
+  syncSliders(r);
+  const contrato = r.tipoContrato === 'indefinido' ? 'Indefinido' : r.tipoContrato === 'plazoFijo' ? 'Plazo fijo' : 'Obra/faena';
+  let emp = '';
+  emp += row('Remuneración bruta (haberes)', fmt(r.totalHaberes));
+  emp += row(`AFC empleador (${r.pctAfcEmp}% · ${contrato})`, fmt(r.afcEmp), 'empresa');
+  emp += row(`SIS AFP (${r.pctSIS}%)`, fmt(r.sisAfp), 'empresa');
+  emp += row(`Mutual de Seguridad (${r.pctMutual}%)`, fmt(r.mutual), 'empresa');
+  document.getElementById('liq-empresa').innerHTML = emp;
+  document.getElementById('res-costo-empresa').textContent = fmt(r.costoTotal);
+  // Refrescar tabla si está abierta
+  if (document.getElementById('panel-variacion').style.display === 'block') {
+    renderVariacion(r.totalImponible, r.totalHaberes, r.tipoContrato, r.pctAfcEmp, r.pctSIS, r.pctMutual);
+  }
+}
+
+function renderComparador(rA, rB) {
+  const fields = [
+    { label: 'Total imponible',      keyA: 'totalImponible', keyB: 'totalImponible', cls: '' },
+    { label: 'AFP',                  keyA: 'montoAFP',       keyB: 'montoAFP',       cls: 'red' },
+    { label: 'Salud',                keyA: 'montoSalud',     keyB: 'montoSalud',     cls: 'red' },
+    { label: 'AFC trabajador',       keyA: 'montoAFC',       keyB: 'montoAFC',       cls: 'red' },
+    { label: 'APV',                  keyA: 'apv',            keyB: 'apv',            cls: 'red' },
+    { label: 'Impuesto único',       keyA: 'impuesto',       keyB: 'impuesto',       cls: 'red' },
+    { label: 'Otros descuentos',     keyA: 'otrosDescuentos',keyB: 'otrosDescuentos',cls: 'red' },
+    { label: 'Total descuentos',     keyA: 'totalDesc',      keyB: 'totalDesc',      cls: 'red', total: true },
+    { label: '✦ Sueldo líquido',     keyA: 'liquido',        keyB: 'liquido',        cls: 'green', highlight: true },
+    { label: '── Costo empresa', header: true },
+    { label: 'AFC empleador',        keyA: 'afcEmp',         keyB: 'afcEmp',         cls: 'orange' },
+    { label: 'SIS AFP',              keyA: 'sisAfp',         keyB: 'sisAfp',         cls: 'orange' },
+    { label: 'Mutual',               keyA: 'mutual',         keyB: 'mutual',         cls: 'orange' },
+    { label: '✦ Costo total empresa',keyA: 'costoTotal',     keyB: 'costoTotal',     cls: 'orange', highlight: true },
+  ];
+
+  let html = `<table class="comp-table">
+    <thead><tr>
+      <th>Concepto</th>
+      <th class="a">Opción A</th>
+      <th class="b">Opción B</th>
+      <th>Diferencia (B-A)</th>
+    </tr></thead><tbody>`;
+
+  for (const f of fields) {
+    if (f.header) {
+      html += `<tr><td colspan="4" style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--muted);padding:10px 10px 4px;letter-spacing:.05em;">${f.label}</td></tr>`;
+      continue;
+    }
+    const vA = rA[f.keyA] || 0;
+    const vB = rB[f.keyB] || 0;
+    const diff = vB - vA;
+    const diffCls = diff > 0 ? 'diff-pos' : diff < 0 ? 'diff-neg' : '';
+    const trCls = f.highlight ? 'highlight' : f.total ? 'total' : '';
+    html += `<tr class="${trCls}">
+      <td>${f.label}</td>
+      <td class="${f.cls}">${fmt(vA)}</td>
+      <td class="${f.cls}">${fmt(vB)}</td>
+      <td class="${diffCls}">${diff !== 0 ? fmtDiff(diff) : '—'}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  document.getElementById('comp-tabla').innerHTML = html;
+}
+
+// ════════════════════════════════════════════════════════
+// CALCULAR PRINCIPAL
+// ════════════════════════════════════════════════════════
+
+function calcular() {
+  const errBox = document.getElementById('errorBox');
+  errBox.style.display = 'none';
+  const cfg = getConfig();
+
+  if (modoActual === 'bruto') {
+    const sueldoBase        = num('sueldoBase');
+    const gratificacion     = gratifAutoOn ? gratificacionAuto(sueldoBase, cfg.imm) : num('gratificacion');
+    const bonosImponibles   = num('bonosImponibles');
+    const movilizacion      = num('movilizacion');
+    const colacion          = num('colacion');
+    const viaticos          = num('viaticos');
+    const otrosNoImp        = num('otrosNoImp');
+    const bonosNoImponibles = movilizacion + colacion + viaticos + otrosNoImp;
+    const apv               = num('apv');
+    const otrosDescuentos   = num('otrosDescuentos');
+    const tipoContrato      = val('tipoContrato');
+
+    if (sueldoBase <= 0) { errBox.textContent = 'Ingresa un sueldo base válido.'; errBox.style.display = 'block'; return; }
+
+    const totalImponible = sueldoBase + gratificacion + bonosImponibles;
+    const r = calcularDesdeImponible(totalImponible, { ...cfg, bonosNoImponibles, apv, otrosDescuentos, tipoContrato });
+
+    renderLiquidacion(r, 'bruto', sueldoBase, gratificacion, bonosImponibles,
+      { movilizacion, colacion, viaticos, otrosNoImp });
+    renderEmpresa(r);
+    document.getElementById('resultado').classList.remove('hidden');
+    document.getElementById('resultado-comp').classList.add('hidden');
+
+  } else if (modoActual === 'inverso') {
+    const liquidoDeseado    = num('inv-liquido');
+    const apv               = num('inv-apv');
+    const bonosImponibles   = num('inv-bonosImp');
+    const movilizacion      = num('inv-movil');
+    const colacion          = num('inv-colacion');
+    const viaticos          = num('inv-viaticos');
+    const otrosNoImp        = num('inv-otrosNoImp');
+    const bonosNoImponibles = movilizacion + colacion + viaticos + otrosNoImp;
+    const otrosDescuentos   = num('inv-otrosDesc');
+    const tipoContrato      = val('inv-tipoContrato');
+    const imm               = cfg.imm;
+
+    if (liquidoDeseado <= 0) { errBox.textContent = 'Ingresa un líquido deseado válido.'; errBox.style.display = 'block'; return; }
+
+    const r = calcularInverso(liquidoDeseado, { ...cfg, bonosNoImponibles, apv, otrosDescuentos, tipoContrato });
+    if (!r) { errBox.textContent = 'No se pudo calcular el imponible. Revisa los parámetros.'; errBox.style.display = 'block'; return; }
+
+    // Descomponer imponible: gratificación → sueldo base
+    let gratificacion;
+    if (invGratifAutoOn) {
+      // gratif = min(base*0.25, tope), base = imponible - bonosImp - gratif
+      // Con tope: si base*0.25 <= tope → base = (imp - bonosImp) / 1.25
+      const tope = Math.floor((4.75 * imm) / 12);
+      const baseConGratif = r.totalImponible - bonosImponibles;
+      const baseEstimada  = Math.floor(baseConGratif / 1.25);
+      const gratifEstimada = Math.floor(baseEstimada * 0.25);
+      if (gratifEstimada <= tope) {
+        gratificacion = gratifEstimada;
+      } else {
+        gratificacion = tope;
+      }
+      document.getElementById('inv-gratif').value = gratificacion;
+    } else {
+      gratificacion = num('inv-gratif');
+    }
+    const sueldoBase = r.totalImponible - gratificacion - bonosImponibles;
+
+    renderLiquidacion(r, 'inverso', sueldoBase, gratificacion, bonosImponibles,
+      { movilizacion, colacion, viaticos, otrosNoImp });
+    renderEmpresa(r);
+    document.getElementById('resultado').classList.remove('hidden');
+    document.getElementById('resultado-comp').classList.add('hidden');
+
+  } else {
+    // COMPARADOR
+    const idA = { base:'ca-base', gratif:'ca-gratif', bonosImp:'ca-bonosImp', bonosNoImp:'ca-bonosNoImp', apv:'ca-apv', contrato:'ca-contrato' };
+    const idB = { base:'cb-base', gratif:'cb-gratif', bonosImp:'cb-bonosImp', bonosNoImp:'cb-bonosNoImp', apv:'cb-apv', contrato:'cb-contrato' };
+
+    const buildCfgComp = ids => ({
+      ...cfg,
+      bonosNoImponibles: num(ids.bonosNoImp),
+      apv: num(ids.apv),
+      otrosDescuentos: 0,
+      tipoContrato: val(ids.contrato),
+    });
+
+    const rA = calcularDesdeImponible(num(idA.base) + num(idA.gratif) + num(idA.bonosImp), buildCfgComp(idA));
+    const rB = calcularDesdeImponible(num(idB.base) + num(idB.gratif) + num(idB.bonosImp), buildCfgComp(idB));
+
+    if (!rA || !rB) { errBox.textContent = 'Ingresa valores válidos en ambas opciones.'; errBox.style.display = 'block'; return; }
+
+    renderComparador(rA, rB);
+    document.getElementById('resultado-comp').classList.remove('hidden');
+    document.getElementById('resultado').classList.add('hidden');
+  }
+}
+
+// ── Init ──
+window.addEventListener('DOMContentLoaded', () => { initIMM(); initUTM(); calcular(); });
+</script>
+</body>
+</html>
