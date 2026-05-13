@@ -411,18 +411,26 @@
       <div id="config-panel">
         <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:8px;">Trabajador</div>
         <div class="field" style="margin-bottom:10px;">
-          <label>AFP</label>
-          <select id="selectAFP" onchange="seleccionarAFP()">
-            <option value="">— Seleccionar AFP —</option>
-            <option value="11.44">AFP Capital (11.44%)</option>
-            <option value="11.44" data-nombre="Cuprum">AFP Cuprum (11.44%)</option>
-            <option value="11.27">AFP Habitat (11.27%)</option>
-            <option value="10.58">AFP Modelo (10.58%)</option>
-            <option value="11.16">AFP PlanVital (11.16%)</option>
-            <option value="11.45" selected>AFP ProVida (11.45%)</option>
-            <option value="10.49">AFP Uno (10.49%)</option>
-            <option value="">Manual</option>
-          </select>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="chkJubilado" onchange="toggleJubilado()" style="width:16px;height:16px;cursor:pointer;" />
+            Trabajador jubilado (no cotiza AFP ni AFC)
+          </label>
+        </div>
+        <div id="panel-afp">
+          <div class="field" style="margin-bottom:10px;">
+            <label>AFP</label>
+            <select id="selectAFP" onchange="seleccionarAFP()">
+              <option value="">— Seleccionar AFP —</option>
+              <option value="11.44">AFP Capital (11.44%)</option>
+              <option value="11.44" data-nombre="Cuprum">AFP Cuprum (11.44%)</option>
+              <option value="11.27">AFP Habitat (11.27%)</option>
+              <option value="10.58">AFP Modelo (10.58%)</option>
+              <option value="11.16">AFP PlanVital (11.16%)</option>
+              <option value="11.45" selected>AFP ProVida (11.45%)</option>
+              <option value="10.49">AFP Uno (10.49%)</option>
+              <option value="">Manual</option>
+            </select>
+          </div>
         </div>
         <div class="field-row" style="margin-bottom:13px;">
           <div class="field"><label>% AFP</label><input type="number" id="pctAFP" value="11.45" min="0" max="20" step="0.01" /></div>
@@ -783,6 +791,27 @@ function seleccionarAFP() {
   const pct = sel.value;
   if (pct !== '') {
     document.getElementById('pctAFP').value = pct;
+  }
+}
+
+function toggleJubilado() {
+  const jubilado = document.getElementById('chkJubilado').checked;
+  const panelAFP = document.getElementById('panel-afp');
+  const pctAFP   = document.getElementById('pctAFP');
+  const pctAFC   = document.getElementById('pctAFC');
+
+  if (jubilado) {
+    panelAFP.style.display = 'none';
+    pctAFP.value = 0;
+    pctAFP.disabled = true;
+    pctAFC.value = 0;
+    pctAFC.disabled = true;
+  } else {
+    panelAFP.style.display = 'block';
+    pctAFP.disabled = false;
+    pctAFC.disabled = false;
+    seleccionarAFP();
+    pctAFC.value = 0.6;
   }
 }
 
