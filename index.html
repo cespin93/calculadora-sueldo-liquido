@@ -460,6 +460,11 @@
           <input type="number" id="imm" value="539000" min="0" step="1" />
           <div class="hint" id="imm-hint">Cargando valor vigente…</div>
         </div>
+        <div class="field">
+          <label>Valor UF ($)</label>
+          <input type="number" id="uf" value="40610.69" min="1" step="0.01" oninput="updateTopeHint()" />
+          <div class="hint" id="uf-hint">Tope AFP/Salud: 90 UF = $3.654.962 · Tope AFC: 135,2 UF = $5.490.565 · Fuente: Previred</div>
+        </div>
       </div>
       <button class="btn" id="btn-calcular" onclick="calcular()">Calcular sueldo líquido</button>
       <div class="error-box" id="errorBox"></div>
@@ -598,24 +603,30 @@ function calcularImpuesto(baseTributable, utm) {
 
 function calcularDesdeImponible(imp, cfg) {
   const { bonosNoImponibles, otrosDescuentos, apv, tipoContrato,
-          pctAFP, pctSalud, pctAFC, pctAfcEmpIndef, pctAfcEmpFijo, pctSIS, pctMutual, utm } = cfg;
+          pctAFP, pctSalud, pctAFC, pctAfcEmpIndef, pctAfcEmpFijo, pctSIS, pctMutual, utm, uf } = cfg;
+
+  // Topes previsionales (Previred): 90 UF para AFP/Salud/SIS, 135,2 UF para AFC
+  const topeAfpSalud = Math.round(90    * (uf || 40610.69));
+  const topeAFCuf    = Math.round(135.2 * (uf || 40610.69));
+  const impAfpSalud  = Math.min(imp, topeAfpSalud);
+  const impAFCbase   = Math.min(imp, topeAFCuf);
 
   const totalHaberes = imp + bonosNoImponibles;
-  const montoAFP     = Math.round(imp * pctAFP   / 100);
-  const montoSalud   = Math.round(imp * pctSalud / 100);
+  const montoAFP     = Math.round(impAfpSalud * pctAFP   / 100);
+  const montoSalud   = Math.round(impAfpSalud * pctSalud / 100);
   const afcAplica    = tipoContrato === 'indefinido';
-  const montoAFC     = afcAplica ? Math.round(imp * pctAFC / 100) : 0;
+  const montoAFC     = afcAplica ? Math.round(impAFCbase * pctAFC / 100) : 0;
   const leyesSoc     = montoAFP + montoSalud + montoAFC;
   const baseTrib     = Math.max(0, imp - leyesSoc - apv);
   const impuesto     = calcularImpuesto(baseTrib, utm);
   const totalDesc    = leyesSoc + impuesto + otrosDescuentos;
   const liquido      = totalHaberes - totalDesc;
 
-  // Costo empresa
+  // Costo empresa (también con topes)
   const pctAfcEmp  = tipoContrato === 'indefinido' ? pctAfcEmpIndef : pctAfcEmpFijo;
-  const afcEmp     = Math.round(imp * pctAfcEmp  / 100);
-  const sisAfp     = Math.round(imp * pctSIS     / 100);
-  const mutual     = Math.round(imp * pctMutual  / 100);
+  const afcEmp     = Math.round(impAFCbase   * pctAfcEmp / 100);
+  const sisAfp     = Math.round(impAfpSalud  * pctSIS    / 100);
+  const mutual     = Math.round(impAfpSalud  * pctMutual / 100);
   const costoTotal = totalHaberes + afcEmp + sisAfp + mutual;
 
   return {
@@ -624,30 +635,29 @@ function calcularDesdeImponible(imp, cfg) {
     baseTrib, impuesto, otrosDescuentos, totalDesc, liquido,
     afcEmp, sisAfp, mutual, costoTotal,
     pctAFP, pctSalud, pctAFC, pctAfcEmp, pctSIS, pctMutual,
-    tipoContrato,
+    tipoContrato, topeAfpSalud, topeAFCuf,
   };
 }
 
 function calcularInverso(liquidoDeseado, cfg) {
-  const { bonosNoImponibles, otrosDescuentos, apv, tipoContrato, pctAFP, pctSalud, pctAFC, utm } = cfg;
-  const afcPct = tipoContrato === 'indefinido' ? pctAFC : 0;
-  const k = (pctAFP + pctSalud + afcPct) / 100;
+  // Búsqueda binaria: maneja topes previsionales correctamente
+  const { bonosNoImponibles } = cfg;
+  let lo = Math.max(1, liquidoDeseado - (bonosNoImponibles || 0));
+  let hi = lo * 4;
 
-  for (const t of TABLA_IMPUESTO) {
-    const f = t.factor, r = t.rebaja;
-    const divisor = (1 - k) * (1 - f);
-    if (divisor <= 0) continue;
-    // Con APV: I = (L - apv*f - r*utm + otros - bonosNoImp) / ((1-k)*(1-f))
-    const numerador = liquidoDeseado - apv * f - r * utm + otrosDescuentos - bonosNoImponibles;
-    const imp = numerador / divisor;
-    if (imp <= 0) continue;
-    const baseTrib    = Math.max(0, imp * (1 - k) - apv);
-    const baseTribUtm = baseTrib / utm;
-    if (baseTribUtm >= t.desde && baseTribUtm < t.hasta) {
-      return calcularDesdeImponible(Math.round(imp), { ...cfg, tipoContrato, pctAFC: afcPct });
-    }
+  for (let i = 0; i < 80; i++) {
+    const mid = Math.round((lo + hi) / 2);
+    const r = calcularDesdeImponible(mid, cfg);
+    if (r.liquido < liquidoDeseado) lo = mid;
+    else hi = mid;
+    if (hi - lo <= 1) break;
   }
-  return null;
+
+  const r1 = calcularDesdeImponible(lo, cfg);
+  const r2 = calcularDesdeImponible(hi, cfg);
+  const r = Math.abs(r1.liquido - liquidoDeseado) <= Math.abs(r2.liquido - liquidoDeseado) ? r1 : r2;
+  if (Math.abs(r.liquido - liquidoDeseado) > 500) return null;
+  return r;
 }
 
 function gratificacionAuto(sueldoBase, imm) {
@@ -687,6 +697,7 @@ function getConfig() {
     pctMutual:       num('pctMutual'),
     utm:             num('utm'),
     imm:             num('imm'),
+    uf:              parseFloat(document.getElementById('uf').value) || 40610.69,
   };
 }
 
@@ -784,6 +795,14 @@ function seleccionarUTM() {
   document.getElementById('utm').value = UTM_2026[mes].utm;
   document.getElementById('utm-hint').textContent =
     `Fuente: SII · ${UTM_2026[mes].label} · $${UTM_2026[mes].utm.toLocaleString('es-CL')}`;
+}
+
+function updateTopeHint() {
+  const uf = parseFloat(document.getElementById('uf').value) || 40610.69;
+  const topeAfp = Math.round(90    * uf);
+  const topeAfc = Math.round(135.2 * uf);
+  document.getElementById('uf-hint').textContent =
+    `Tope AFP/Salud: 90 UF = $${topeAfp.toLocaleString('es-CL')} · Tope AFC: 135,2 UF = $${topeAfc.toLocaleString('es-CL')} · Fuente: Previred`;
 }
 
 function seleccionarAFP() {
@@ -906,6 +925,8 @@ function onSliderChange() {
   if (!lastR) return;
   const imp          = lastR.totalImponible;
   const totalHaberes = lastR.totalHaberes;
+  const impAfpSalud  = Math.min(imp, lastR.topeAfpSalud);
+  const impAFCbase   = Math.min(imp, lastR.topeAFCuf);
   const pctAfcEmp    = parseFloat(document.getElementById('sl-afc').value)    || 0;
   const pctSIS       = parseFloat(document.getElementById('sl-sis').value)    || 0;
   const pctMutual    = parseFloat(document.getElementById('sl-mutual').value) || 0;
@@ -916,9 +937,9 @@ function onSliderChange() {
   document.getElementById('pctSIS').value         = pctSIS;
   document.getElementById('pctMutual').value      = pctMutual;
 
-  const afcEmp     = Math.round(imp * pctAfcEmp / 100);
-  const sisAfp     = Math.round(imp * pctSIS    / 100);
-  const mutual     = Math.round(imp * pctMutual / 100);
+  const afcEmp     = Math.round(impAFCbase  * pctAfcEmp / 100);
+  const sisAfp     = Math.round(impAfpSalud * pctSIS    / 100);
+  const mutual     = Math.round(impAfpSalud * pctMutual / 100);
   const costoTotal = totalHaberes + afcEmp + sisAfp + mutual;
   const contrato   = lastR.tipoContrato === 'indefinido' ? 'Indefinido'
                    : lastR.tipoContrato === 'plazoFijo'  ? 'Plazo fijo' : 'Obra/faena';
@@ -948,6 +969,9 @@ function toggleVariacion() {
 }
 
 function renderVariacion(imp, totalHaberes, tipoContrato, pctAfcEmp, pctSIS, pctMutualActual) {
+  const impAfpSalud = Math.min(imp, lastR ? lastR.topeAfpSalud : imp);
+  const impAFCbase  = Math.min(imp, lastR ? lastR.topeAFCuf   : imp);
+
   const escenarios = [
     { label: 'Tasa base',       pct: 0.93 },
     { label: 'Riesgo bajo',     pct: 1.50 },
@@ -957,9 +981,9 @@ function renderVariacion(imp, totalHaberes, tipoContrato, pctAfcEmp, pctSIS, pct
   ];
 
   const costoBase = totalHaberes
-    + Math.round(imp * pctAfcEmp / 100)
-    + Math.round(imp * pctSIS    / 100)
-    + Math.round(imp * 0.93      / 100);  // diferencial respecto a tasa base
+    + Math.round(impAFCbase  * pctAfcEmp / 100)
+    + Math.round(impAfpSalud * pctSIS    / 100)
+    + Math.round(impAfpSalud * 0.93      / 100);
 
   let html = `<table class="var-table">
     <thead><tr>
@@ -967,9 +991,9 @@ function renderVariacion(imp, totalHaberes, tipoContrato, pctAfcEmp, pctSIS, pct
     </tr></thead><tbody>`;
 
   for (const e of escenarios) {
-    const mutual     = Math.round(imp * e.pct / 100);
-    const afcEmp     = Math.round(imp * pctAfcEmp / 100);
-    const sisAfp     = Math.round(imp * pctSIS    / 100);
+    const mutual     = Math.round(impAfpSalud * e.pct    / 100);
+    const afcEmp     = Math.round(impAFCbase  * pctAfcEmp / 100);
+    const sisAfp     = Math.round(impAfpSalud * pctSIS    / 100);
     const costoTotal = totalHaberes + afcEmp + sisAfp + mutual;
     const diff       = costoTotal - costoBase;
     const diffStr    = diff === 0 ? '—' : (diff > 0 ? '+' : '') + '$' + Math.abs(diff).toLocaleString('es-CL');
